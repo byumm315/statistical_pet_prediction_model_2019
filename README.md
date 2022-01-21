@@ -5,7 +5,7 @@
 
 **전처리**
 
-Preprocessing 폴더에 파이썬 코드와 파일이 있습니다.
+Preprocessing 폴더에 R 코드와 파일이 있습니다.
 
 유기견 공고문 데이터 원문을 분석하기 쉬운 형태로 변환하는 과정입니다.
 
@@ -13,7 +13,7 @@ Preprocessing 폴더에 파이썬 코드와 파일이 있습니다.
 
 **모형구축과정**
 
-Statistical Modeling 폴더에 파이썬 코드와 파일이 있습니다.
+Statistical Modeling 폴더에 R 코드와 파일이 있습니다.
 
 유기견입양확률예측모형을 구축했습니다.
 
