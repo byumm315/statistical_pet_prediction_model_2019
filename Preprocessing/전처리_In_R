@@ -1,0 +1,316 @@
+### R CODE 입니다.###
+
+rm(list=ls())
+setwd('C:/Users/user/Desktop/')
+
+install.packages("stringr")
+install.packages("dplyr")
+dataset_2<-read.csv('2017.csv',header=T)
+dataset_3<-read.csv('2018.csv',header=T)
+dataset<-rbind(dataset_2,dataset_3)
+
+period <- as.Date(substr(as.character(dataset[,7]), 1, 10), tryFormats='%Y-%m-%d')
+index <- (period <= '2018-12-31') & (period >= '2017-01-01')
+dataset <- dataset[index,] 
+dataset$date <- period[index]
+
+# breed variable #
+
+dataset$breed <- substring(dataset[,2], 4)
+breed.table <- read.csv('breed_ref.csv', header=T)
+breed.temp <- rep(NA, nrow(dataset))
+for (k in 1:dim(breed.table)[1]) { breed.temp[dataset$breed %in% breed.table[k,1]] <- as.character(breed.table[k,2]) } 
+dataset$breed<-breed.temp
+dataset$breed[which(dataset$breed == '')]<-NA
+
+# city size variable #
+
+city.new1 <- gsub(' ', '', substr(as.character(dataset[,1]),1,2))
+city.new2 <- gsub(' ', '', substr(as.character(dataset[,1]),4,5))
+city.new <- paste0(city.new1, city.new2)
+
+dataset$city<-city.new
+
+city.table <- read.csv('city_temp_071619.csv', header=F)
+city.temp1 <- as.character(city.table[,2])
+city.temp2 <- city.temp1[nchar(city.temp1) > 2]
+city.temp2 <- substr(city.temp2, 1, 2)
+city.temp1[nchar(city.temp1) > 2] <- city.temp2 
+city.ref <- paste0(city.table[,1], city.temp1)
+
+city.size <- rep(NA, length(city.new))
+for (k in 1:length(city.ref)) { city.size[city.new == as.character(city.ref[k])] <- as.character(city.table[k,4]) }
+dataset$city_size <- city.size
+
+# gender variable #
+
+dataset$gender <- as.character(dataset[,4])
+dataset$gender[which(dataset$gender=='미상')]<-NA
+
+# surgery variable #
+dataset$surgery <- as.character(dataset[,5])
+dataset$surgery[which(dataset$surgery=='미상')]<-NA
+
+# age variable #
+age.temp2<-as.character(dataset$나이.체중)
+
+library(stringr)
+for (i in 1:length(age.temp2)){
+  age.temp2[i]<- str_split(age.temp2[i],pattern="/",simplify=TRUE)[,1]
+}
+
+age.temp2 <- gsub('\\(', '', age.temp2) 
+age.temp2 <- gsub('\\)', '', age.temp2)
+age.temp2<-gsub('년생','',age.temp2)
+age.temp2<-gsub('[^0-9.]','',age.temp2)
+age.temp2<-as.numeric(age.temp2)
+
+yearr<-seq(1977,2018)
+
+period <- as.Date(substr(as.character(dataset[,7]), 1, 10), tryFormats='%Y-%m-%d')
+
+index <- (period <= '2017-12-31') & (period >= '2017-01-01')
+age.temp2[which(index==T)]<-2018-age.temp2[which(index==T)]
+
+index <- (period <= '2018-12-31') & (period >= '2018-01-01')
+age.temp2[which(index==T)]<-2019-age.temp2[which(index==T)]
+
+age.temp2[which(age.temp2 <= 0)]<-NA
+age.temp2[which(age.temp2 > 20)]<-NA
+
+dataset$age <- age.temp2
+
+# weight variable #
+
+weight.temp<-c()
+
+for (i in 1:length(dataset[,6])){
+  weight.temp[i]<- str_split(dataset[i,6],pattern="/",simplify=TRUE)[,2]
+}
+
+weight.temp <- gsub('Kg', '', weight.temp) 
+weight.temp <- gsub('\\(', '', weight.temp) 
+weight.temp <- gsub('\\)', '', weight.temp)
+weight.temp <- gsub('..', '.', weight.temp, fixed=T)
+weight.temp <- gsub('/', '.', weight.temp)
+weight.temp <- gsub(',', '.', weight.temp)
+weight.temp <- gsub("'", '.', weight.temp)
+weight.temp <- gsub('`', '', weight.temp)
+weight.temp <- gsub(' ', '', weight.temp)
+
+weight.temp[which(grepl('-', weight.temp))[which(unlist(lapply(strsplit(weight.temp[grepl('-', weight.temp)], '-'), function(x) length(x))) != 2)]]<-NA
+weight.temp[which(grepl('~', weight.temp))[which(unlist(lapply(strsplit(weight.temp[grepl('~', weight.temp)], '~'), function(x) length(x))) != 2)]]<-NA
+
+weight.temp[grepl('-', weight.temp)] <- apply(matrix(as.numeric(unlist(strsplit(weight.temp[grepl('-', weight.temp)], '-'))), ncol=2, byrow=T), 1, mean)
+weight.temp[grepl('~', weight.temp)]<- apply(matrix(as.numeric(unlist(strsplit(weight.temp[grepl('~', weight.temp)], '~'))), ncol=2, byrow=T), 1, mean)
+
+weight.temp[grep('\\p{Hangul}', weight.temp, perl=TRUE)]<-NA
+
+weight.temp[grep('[[:blank:]]', weight.temp)]<-NA
+
+weight.temp<-gsub('kg','',weight.temp)
+weight.temp[which(grepl('g',weight.temp))]<-as.numeric(gsub('[^0-9.]','',gsub('g','',weight.temp[which(grepl('g',weight.temp))])))/100
+weight.temp[which(weight.temp %in% unique(weight.temp)[is.na(as.numeric(unique(weight.temp)))])]<-NA
+
+weight.temp <- as.numeric(weight.temp)
+
+weight.temp[which(weight.temp <= 0)]<-NA
+weight.temp[which(weight.temp>100)]<-NA
+
+dataset$weight <- weight.temp
+
+#color variable#
+
+#install.packages("dplyr")
+library("dplyr")
+
+
+white.list <- c('흰', '하양','whit','뱃색','salt','솔트','크림','벡','아비보','흔색','cream', 
+                '화이트', '백', '하얀', '아이보','힌','휜색','훤색','크 림 색','흐ㅏㄴ',
+                '힁색','Whit','WH','WHIT','밀크','희색','흐니색','아이볼리','흼','w','W','희낵','흐;ㄴ','희',
+                '희샌','아리보','이이보','읜색','상아','횐색','크리색','맥색','Ivory','아니보리',
+                '슈나우져색','슈나우져의 그 색','블랜하임','Salt','회이트','맥','흐니','하이트','화잇','화이',
+                '흰블','블흰','횐','해색','슈나유져색','뱃색','희색','읜','와이트','휜','하양색')
+
+brown.list <- c('Apicot','노란','초콜릿','브라운','놀나색','진한 쵸컬',
+                '칡','진한 초콜','쵸콜렛','BUFF','버프','Buff', '초코','에프리','감색',
+                '에푸리','브라우','엘로', '쵸코', '걀', '황토', '황', '노랑', '누런', '고동', '노',
+                'Brown', '엘로우', '레몬', '커피', '항색', '붉은','커피', '애프리',
+                '밤', '레드', '누렁', '살구' , 'apri','Apri', '살색', '골드', '골든', '금', '황금', 
+                '초콜렛', '잔걸색', '카키','길섹','길색','brown','암적색','Apri Coat','tan','탄','Tan',
+                '밀색','애푸리','와인색','적색','옐로','진한 쵸컬','Red','RED','진베이직','베이지',
+                '베지','BEIGE','초크렛','대추','베이잊','Br','브라둔','애플','자색','갤색','자주',
+                'BROWN','누른','베이직','보라색','연배이직','추콜릿','쵸크','buff','코코아','누룽','br',
+                '쵸컬릿','Gold','샴페','누란','흙','칼키','GOLD','가랙','걸색','초크','진베','초쿄',
+                '횡색','고둥','가랫ㄱ','각색','짙은고둥','오렌지','홍색','강색','귤색','살수색','고등',
+                '가색','쵸고','카카오','초쵸','오트밀','카라멜모색','아이비색','블랜하임','yellow',
+                '암적','적','gold','부라운','요크셔 테리어 색','요키 색','요크셔색','요키색',
+                '요크셔테리어 색깔','배지','요크셔특유색','누르스럼','초모','황색','확색','길','항색','네눈박이',
+                '라떼 색깔','누러이','미색','갈','감','브란운','기ㅏㄹ','베리지','브라움','걸','항토','치즈',
+                '카라멜','누럼','누렇고','녹','걀')
+
+black.list <- c('blac','흑','Blac','겅정색','븍랙','불랙','블랙',
+                '점정','Papper','네눈박이','획색','회', '실버', '재색', '그레이', '늑대', 
+                'silver', '쥐색', '잿빛', '까만색','후추','건정','페퍼','연한희색','횡색','gray',
+                'steel blue','블루스틸','청색','블루스톤','Steel/blue','브루스틸',
+                '블루 스틸','스틸블루','SEEL BLUE','Steel blue','steel/blue','steel','BL','은빛',
+                '스틸 블루','홰색','수틸블루','BLACK','은빗','까망','블객','잿색','거멍',
+                '감장','GREY','겸정','그랭','제색','남 색','grey','거무스름','까만','거정','컴정',
+                '훅색','슈나우져색','슈나우져의 그 색','요크셔색','요크셔테리어 색깔','Papper','요크셔 테리어 색',
+                '요키 색','재새','간색','남색','감정','요크셔특유색','군청','겅정','겅믄색','블래',
+                '흰블','블흰','블랜','브랙','요키색','은색','먹','슈나유져색','겁정','쿠키색',
+                '감청','회색','껌정','검','그래이','걱정','재구','곤색','걱정','은비','청','블루','곤')
+
+brindle.list <- c('호피', '브린들','브린돌','호반','얼룰무니','얼녹','얼눅','호구', '점박', 
+                  '얼룩', '바둑','억룩무뉘','범무늬','젖소무늬','젖소색','카오스','Blindle','달마시안',
+                  '올룩무늬','젖소 무늬','호랑이','재구색상','비둑이','젖소','데플','브랜들','줄무늬',
+                  '바독이','블린들,흰색','블루멀','불루멀','검정무늬','반점','세이블','땡땡이','점바기','점뱅이',
+                  '호핏','어룩','박둑이','턱시도')
+#brindle.list 에는 줄무늬 , 점박이, 불루멀같은 경우만 넣어음.확실히 무늬가 있는 동물만
+
+etc.list <- c('삼색','여러가지색','투톤','잡색','복합색','기타','섞임',
+              '3색','혼합색','트라이칼라','삼색혼합','2색', '파티','파티색',
+              '세가지','2칼','혼색','tri-color','혼합','복합','3칼','세가지색','혼합색',
+              '3가지','혼 합','다채로','혼합샛','세가지 색','파티칼라','3색파티','턱시도',
+              '2칼라','3칼라','가지 각색','다양','쓰리톤','쓰리 칼라','트라이','쓰리칼라','투칼라')
+#이 경우 어떤 색이 혼합되어있는지 알 수 없어서 etc로 둠.
+
+color.temp <- matrix(0, nrow(dataset), 5)
+
+#데이터의 색상변수 속에 컬러리스트가 있는지 없는지 확인할 수 있다.
+
+for (k in 1:length(white.list)) { color.temp[grep(white.list[k], dataset[,3]), 1] <- 1 }
+for (k in 1:length(brown.list)) { color.temp[grep(brown.list[k], dataset[,3]), 2] <- 2 }
+for (k in 1:length(black.list)) { color.temp[grep(black.list[k], dataset[,3]), 3] <- 3 }
+for (k in 1:length(brindle.list)) { color.temp[grep(brindle.list[k], dataset[,3]), 4] <- 4 }
+for (k in 1:length(etc.list)) { color.temp[grep(etc.list[k], dataset[,3]), 5] <- 5 }
+
+#color.temp 를 데이터프레임으로 변환하여 c(0,0,0,0,5) 위치를 인덱스를 통해 가져온다.
+#이때 0,0,0,0,5 는 데이터의 색상변수가 기타에 해당하는 어휘만 있는 경우이다.
+
+color.temp<-as.data.frame(color.temp)
+etc.index<-row.names(subset(color.temp,V1==0&V2==0&V3==0&V4==0&V5==5))
+etc.index<-as.numeric(etc.index)
+
+#color를 만든다. 이것은 나중에 dataset의 color변수가 되어 색상의 범주를 알 수 있다.
+
+color <- rep(NA, nrow(dataset))
+
+#색상변수에 나머지 어휘에 대한 색상범주를 구해서 color에 기입한다.
+
+color.temp_1<-as.matrix(color.temp)
+color.temp_1<-color.temp_1[,c(1:4)]
+
+for (i in 1:nrow(dataset)) { color[i] <- paste(c('흰', '갈', '검', '얼룩')[color.temp_1[i,]], collapse = '') }
+color[grep('얼룩', color)] <- '기타'
+color[etc.index] <- '기타'
+
+#색상변수에 기타에 해당하는 어휘만 있는경우 아까 구한 etc.index를 이용해서
+#color에 '기타'라고 입력한다.
+#etc.list 만 있는것을 기타로 하고 etc.list 가 같이 있는 경우에는 기타로 하고싶음.
+#왜냐하면 색상변수에서 검 흰 혼합 이런 경우 우리가 원하기에 흰검으로 나와야 되는데 
+#혼합이라는 말 때문에 기타로 나온다.
+
+#포함되지 않는 색상의 종류 알아보기
+
+other<-dataset[which(color==''),3]
+
+#color에 있는 ""에 NA지정하기
+
+color[color==""]<-NA
+
+#dataset 에 색상의 범주를 나타내는 color 라는 새로운 변수를 만들었다.
+
+dataset$color <- color
+
+##애매한 색상들 살펴보고 추려낸 리스트
+
+BlackBrown<- dataset %>% filter(색상 %in% c("연갈/은","은황색","갈/은","은/황색","은/갈색",      
+                                          "은 갈색","은갈색","금,은","은, 갈색","은갈색탄","은.갈색","갈 은","은/베이지색","은/골드",      
+                                          "은 . 갈","은+갈색","거갈","은노랑","은갈","은.갈","블루&골드","활갈색","윽.갈",        
+                                          "은+갈","블랙/틴","검/가","활색에 검은색","은갈색/노란색","짤간색+회색","확흑",
+                                          "은,갈색","은,갈","갈.은","항회","은.황색","갈색 세퍼트","회항","미색+회색",
+                                          "감/검","감,검은색","감장+갈색","회,감,걸","감갈색","감색+검정색","감검정색", 
+                                          "감색에 껌정톤","연한갈색 등줄기 감정","감정갈색","감정갈색은색","갈색/감장",
+                                          "걸갈색","걸+갈","흑걸","걸/회")) %>% select(공고번호)
+
+
+WhiteBrown <- dataset %>% filter(색상 %in% c('연한은갈색','짤간색+회색','연한갈색 미색',
+                                           '황색+미색','미색+갈색','미색+황색','미색+황색+갈색','미색 + 갈색','갈색+미색','미색/갈색',
+                                           '미색/황색','감/흰색','감색+흰색','감/흰','걸백','걸/흰','항백','백항','흰.베','흰/베','흰,베','흰베파티',
+                                           '흔/갈','흐갈색','흰베','갈박','배황','흰&베','흐갈색','흰색 화색',
+                                           '흰색/화색','항,백','White & Green')) %>% select(공고번호)
+
+WhiteBlack <- dataset %>% filter(색상 %in% c('미색+검정','검정+미색','미색 + 검정',
+                                           '감정에 흰색','감정에 흰색무늬','희색,흰색','횐/희','횐/흰','횐색,읜색','건백색','겸흰','흰,건',
+                                           '은백색')) %>% select(공고번호)
+
+WhBrBl<-dataset %>% filter(색상 %in% c('미색+황색+검정','감/검/흰','흰/갈/감','감/걸/흰',
+                                     '감색+검정+흰색','감,갈,흰','흰,감,갈','감+흰+갈색','흰,갈,감','걸/갈/흰','감/걸/흰',
+                                     '흰걸갈색','걸갈흰색','흰/걸/갈'))%>% select(공고번호)
+
+Black<-dataset %>% filter(색상 %in% c('감청색','검읜색'))%>% select(공고번호)
+Brown<-dataset %>% filter(색상 %in% c('주황제','진아이보리'))%>% select(공고번호)
+
+White<-dataset %>% filter(색상 %in% c('흰,파랑염색','흰색(꼬리 파란색염색)','청황'))%>% select(공고번호)
+
+#해당 리스트에서 공고번호를 뽑아내서 dataset과 일치하는 부분을 가져와 color범주를 지정한다.
+
+BlackBrown<-BlackBrown[[1]]
+dataset$color[which(dataset[,1]%in%BlackBrown)]<-'갈검'
+
+WhiteBrown<-WhiteBrown[[1]]
+dataset$color[which(dataset[,1]%in%WhiteBrown)]<-'흰갈'
+
+WhiteBlack<-WhiteBlack[[1]]
+dataset$color[which(dataset[,1]%in%WhiteBlack)]<-'흰검'
+
+WhBrBl<-WhBrBl[[1]]
+dataset$color[which(dataset[,1]%in%WhBrBl)]<-'흰갈검'
+
+Black<-Black[[1]]
+dataset$color[which(dataset[,1]%in%Black)]<-'검'
+
+Brown<-Brown[[1]]
+dataset$color[which(dataset[,1]%in%Brown)]<-'갈'
+
+White<-White[[1]]
+dataset$color[which(dataset[,1]%in%White)]<-'흰'
+
+#2013~2018 데이터를 적용하고 마지막으로 NA로 놓을법한것(주소,악세사리 등)을 처리한다.
+
+kk<-c('의정부역 맥스타워 인근','마산회원구 회원1동 주민센터','서생면 성내마을회관부근','청평 삼회리 479-13','장천동 마을회관 건물 뒤','백봉리 481',           
+      '남양송림로168 마을회관 인근','백석동 현대밀라트1차 부근','연무읍 봉황로 355-3','금암리 솔고','사직로 14번길 15 삼정두배로 마트','나주시 대흥1길 6-1',      
+      '효학길 131-35','명장로 63번길110','동탄','송우리 금영로얄아파트 203동 303호','눈물자국,친화적','연암 정자 구길 정해진 산소 옆','신정동양천구청상황실 (다음12-15)',   
+      '성황동','외동읍 순금2길 20 쉬어가는 집','제주시 도련길 10','가산금하리','곡성읍 묘천1길','토당동 능곡고등학교부근','홍북읍 홍천문화1길115','함안군 산인면 입곡2길 189-3',          
+      '웅천로 159번길 79','정릉로 8 나길 30 인근','오심2길 24-12','홍천군 동면 새들길 54','전주고등학교앞','광암동 470 캠프 HOVY 앞 노상','안강읍 홍천안길 24-1','분홍색목테','풍기읍 금계로 246-20번지 근처',
+      '영동군 양강면 남전3길 18-81','양남 송정마을회관앞','시루봉로 15가길 9-4 인근','왕곡면 신가신원길 101-65','부산광역시 금정구 두구동 686번지','용산구 신흥로22가길 31','가야읍 성내남길 95',
+      '갈마동 344-11 인근','나정교삼거리~금성삼거리','노란옷 착용','달전천 벚꽃길 근처 밭','가지각색','홍성군 홍성읍 도청 대로 93번길 13-17 부근','전형적인 허스키 색','부산광역시 금정구 부곡동 쌍용아파트',
+      '덕릉로 60길 185','충북 괴산군 칠성면 명태재로미루길 78-14','전형적인 허스키색','갈마동 한마음동산 인근','한림면 금곡리932-4','강경읍 잣디2길 17-1 마당','부산광역시 금정구 세웅병원 주차장 앞 도로',
+      '노랑+ 하늘색 옷 착용, 미용','빨간색 목줄착용','마산회원구 내서읍 평성리 100 앞 연한검정색','회피','빨간색 목줄','밀양시 용평로2길.44-1','남창고등학교쪽 강변 큰도로 버스정류장 쪽',
+      '상전면 금당부락내','갈마동 1420-1 인근','외동읍 문산공단길 306-6','금광동 3657','월롱면 도내리 교회옆','불로동 금호아파트','길음리 15-9','함안군 함안면 괴산2길 167-11','탄현동 탄현마을7단지',
+      '성산구 용지로 127번길 9 6층 601호','성연면 갈현용연동길 110부근','유림면 화촌길 18-9','신정동양천구청상황실 (다음12-20)','십정2동 먹자골목','갈마네거리 인근','노령견','밀양시 가곡15길33-2',
+      '군산시 개정면 운회리 당산 2길 23-6','영동군 영동읍 영동천2길 5-1','흰색에분홍무늬','부산광역시 남구 감만동 418-3 부근','호계 노랑김밥','130호 스피치 믹스 비교적건강한 편임','대송3길 86',
+      '강원도 철원군 갈말읍 여우내길 19','주례1동 사상로 27번길 주변','충남 당진시 호서고등학교 운동장','부산광역시 남구 용호동 동명로169번길 61 부근','금암동 신성2차 아파트','대전 중구 대종로601번길 52-5(선화동) 주변',
+      '금정구 부곡로 156번길 7(부곡동, 부곡2동주민센터)','부산광역시 남구 감만동 우암로70번길 57 부근','토당동 작은친구 동물병원','옥천군 옥천읍 마암리 화목한 교회','백석동 종가대박집','송탄역',
+      '하북면 백록리','동구 금동','청라면 의평길 도로변','성보고등학교','고등동5거리','삼산동 태백산수산앞','양귀 쫑긋. 코 검정. 콧물. 호흡거침. 산후열.','코검정. 위앞니1개/아래앞니2개빠짐.단미안됨.',
+      '금강대학교앞 도로변','다산로 33 다 길 26-1 인근','은행동 은행119안전센터','보더콜리 흰색','갈색 목줄착용','영진2길 삼거리','청원구 사천동 200 새터포등학교','명장로 63번길110','레몬허스키','옥천읍 금구리','구청 당직실','중구청부근','서구청 당직실','횡성군 갑천면 청정로 포동2리',      
+      '장천동 마을회관 건물 뒤','병무청오거리','갈마동 344-11 인근','나정교삼거리~금성삼거리','노란옷 착용','서대문구청','금천동 회전로타리 부근','빨간색 목줄착용','달전천 벚꽃길 근처 밭', 
+      '아산시 실옥동 17-164 흥청가든 앞','성건동 공영주택길','부산광역시 금정구 부곡동 쌍용아파트','덕릉로 60길 185','충북 괴산군 칠성면 명태재로미루길 78-14','서구청경제에너지과',   
+      '갈마동 한마음동산 인근','안골동 커피앤도넛','마산회원구 내서읍 평성리 100 앞','한림면 금곡리932-4','강경읍 잣디2길 17-1 마당','부산광역시 금정구 세웅병원 주차장 앞 도로',
+      '의정부시청','흰고랑','옥천읍 삼청리 655-3','망포동 벽산블루밍후문','경북 청도군 매전면 예전리 174번지 근처','부산광역시 남구 대연동 남구청 당직실 경유','영동군 영동읍 영동천2길 5-1',
+      '남구청부근','밀양시 가곡15길33-2','북구 구청','경북 청도군 청도읍 원정리 628번지 근처','청도군 매전면 남양2리 동행예술학교 근처','금정구 부곡로 156번길 7(부곡동, 부곡2동주민센터)', 
+      '고양동 399 청구 아파트내','청주시 흥덕구','청학동주택가 부근','강서구청 인근','다산로 33 다 길 26-1 인근','홍성군 홍성읍 도청 대로 93번길 13-17 부근')   
+
+dataset$color[which(dataset$색상%in%kk)]<-NA #데이터명변경
+dataset$color[dataset$color==""]<-NA 
+
+# adoption variable #
+
+y.temp <- as.character(dataset[,18])
+y.temp <- gsub('종료', '', y.temp)
+y.temp <- gsub('\\(', '', y.temp) 
+y.temp <- gsub('\\)', '', y.temp)
+dataset$y <- y.temp 
+
+write.csv(dataset,'Total.csv',row.names=FALSE)
