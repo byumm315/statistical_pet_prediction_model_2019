@@ -1,0 +1,58 @@
+
+#K-prototype
+library(clustMixType)
+library("dplyr")
+
+#BASE LINE
+
+setwd('E:/0923_논문_데이터/')
+dataset<-read.csv('DATA2_원자료.csv',header=TRUE)
+levels(dataset$y)<-c(NA,NA,NA,NA,'미입양','미입양','입양','미입양')
+levels(dataset$y)<-c(0,1)
+dataset_1<-dataset[-which(is.na(dataset$y)),]
+dataset_1<-dataset_1[which(rowSums(is.na(dataset_1))==0),]
+
+#dataset_1의 숫자형 변수들을 표준화 시킨 결과	
+mean.dataset <- apply(dataset_1[,5:6], 2, mean)
+sd.dataset <- apply(dataset_1[,5:6], 2, sd)
+dataset_1[,5:6] <- (dataset_1[,5:6] - matrix(mean.dataset, nrow(dataset_1), 2, byrow=T)) / matrix(sd.dataset, nrow(dataset_1), 2, byrow=T)
+
+#K-prototype clustering
+set.seed(20190921)
+lambda <- lambdaest(dataset_1, num.method = 1, fac.method= 1, outtype='numeric')
+kprototypes <- kproto(dataset_1, k=2, lambda=lambda)
+cluster <- kprototypes$cluster
+data_clust <- cbind(dataset_1,cluster)
+clust1 <- data_clust[which(data_clust$cluster == 1),]
+clust2 <- data_clust[which(data_clust$cluster == 2),]
+clust1<-clust1[,-9]
+clust2<-clust2[,-9]
+
+group1<-clust1
+set.seed(20190921)
+ind1 <- sample(2,nrow(group1), replace = TRUE, prob = c(0.7,0.3))
+training <- group1[ind1==1,] 
+test <- group1[ind1==2,]
+
+#y(상태변수)를 기준으로 로지스틱 회귀분석한 결과	
+lrFit <- glm(y ~ breed + city_size + gender + surgery + age + weight+ color, data=training, family=binomial)
+summary(lrFit)
+lrFit_1 <- stepAIC(lrFit,direction='both',trace=F)
+summary(lrFit_1)
+lrPred1 <- predict(lrFit_1, test, type='response')	
+lrPred2 <- factor(ifelse(lrPred1 > 0.5, '1', '0'))
+lrPred2 <- relevel(lrPred2, ref='1')
+test$y<-as.factor(test$y)	
+test$y <- relevel(test$y, ref='1')
+#confusion matrix 결과 
+lrCM <- confusionMatrix(lrPred2, test$y)
+lrCM 
+
+#ROC곡선 결과 (및 AUC)
+lrRoc <- roc(response=test$y, predictor=lrPred1, levels=rev(levels(test$y)))
+lrRoc
+lr_non_result <- round(c('threshold'=0.5, lrCM$overall[1], lrCM$byClass[1:2], 'AUC'=auc(lrRoc), '2.5%'=ci.auc(lrRoc)[1], '97.5%'=ci.auc(lrRoc)[3]), 3)
+lr_non_result
+plot(lrRoc, cex.axis=1.5, cex.lab=2, xlab='Specificity', ylab='Sensitivity')
+points(lrCM$byClass[2], lrCM$byClass[1], pch=16, cex=1.5,col='red')
+legend('bottomright', c('Accuracy:0.662','AUC:0.621',"Sensitivity:0.085",'Specificity:0.971'),col=c('black'),cex=1.3)
