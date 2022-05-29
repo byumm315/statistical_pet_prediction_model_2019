@@ -26,7 +26,7 @@ Statistical Modeling 폴더에 R 코드와 파일이 있습니다.
 
 **모형구축과정2**
 
-Statistical Modeling2 폴더에 R 코드와 파일이 있습니다.
+StatisticalModeling2파일에 R 코드가 있습니다.
 
 유기견입양확률예측모형을 구축했습니다.
 
